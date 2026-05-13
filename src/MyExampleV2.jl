@@ -1,5 +1,6 @@
 module MyExampleV2
 
-# Write your package code here.
+include("functions.jl")
+export my_f
 
 end

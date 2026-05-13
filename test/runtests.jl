@@ -2,5 +2,5 @@ using MyExampleV2
 using Test
 
 @testset "MyExampleV2.jl" begin
-    # Write your tests here.
+    @test my_f(2, 1) == 7
 end
