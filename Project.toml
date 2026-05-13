@@ -1,0 +1,13 @@
+name = "MyExampleV2"
+uuid = "8e5387f6-a2a8-4a7a-9345-0c1922bf078c"
+authors = ["Chris Schellekens"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.10.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
