@@ -1,8 +1,2 @@
-using MyExampleV2
-using Test
-
-@testset "MyExampleV2.jl" begin
-    @test my_f(2, 1) == 7
-    @test my_f(3, 2) == 12
-    @test my_f(3, 1) == 9
-end
+using SafeTestsets
+@safetestset "Benchmark Tests" begin include("functionstest.jl") end
