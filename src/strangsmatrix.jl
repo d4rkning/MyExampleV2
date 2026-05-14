@@ -1,3 +1,5 @@
+using LinearAlgebra
+
 struct StrangsMatrix
     mat::Matrix{Float64}
  end
@@ -85,3 +87,44 @@ function _MulLazyStrangsMatrix(A::LazyStrangsMatrix, b::Vector{Float64})::Vector
 end
 
 Base.:*(A::LazyStrangsMatrix, b::Vector{Float64}) = _MulLazyStrangsMatrix(A, b)
+
+function _MulInPlaceLazyStrangsMatrixFast(c::Vector{Float64}, A::LazyStrangsMatrix, b::Vector{Float64}, α::Float64, β::Float64)
+    n = A.N
+    if length(c) != n || length(b) != n 
+        throw(DimensionMismatch("Matrix and vectoes must have matching dimensions"))
+    end
+    for i in 2:(n-1)
+        c[i] = α*(b[i-1] - 2 * b[i] + b[i+1]) + β*c[i]
+    end
+    c[n] = α*(b[n-1] - 2 * b[n]) + β*c[n]
+    c[1] = α*(-2*b[1] + b[2]) + β*c[1]
+end
+
+function _MulInPlaceLazyStrangMatrixSlow(c::Vector{Float64}, A::LazyStrangsMatrix, b::Vector{Float64}, α::Float64, β::Float64)
+    n = A.N
+    if length(c) != n || length(b) != n
+        throw(DimensionMismatch("Matrix and vectors must have matching dimensions"))
+    end
+    for i in 1:n
+        val = -2.0 * b[i]
+        if i > 1
+            val += 1.0 * b[i-1]
+        end
+        if i < n
+            val += 1.0 * b[i+1]
+        end
+        c[i] = val * α + c[i] * β
+    end
+end
+
+function LinearAlgebra.mul!(c::Vector{Float64}, A::LazyStrangsMatrix, b::Vector{Float64}, α::Float64, β::Float64)
+    _MulInPlaceLazyStrangsMatrixFast(c, A, b, α, β)
+end
+
+A = LazyStrangsMatrix(5)
+b = [1., 2., 3., 4., 5.]
+c = zeros(size(b));
+
+mul!(c, A, b, 1.0, 1.0)
+println("c")
+println(c)
