@@ -17,6 +17,6 @@ export my_factorial
 export MyRange
 export LinSpace
 export find_quantile
-export myevalpoly
+export @myevalpoly
 
 end

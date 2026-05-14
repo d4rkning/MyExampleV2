@@ -10,11 +10,8 @@ end
 
 macro myevalpoly(x, p...)
     ex = :($(p[end]))
-    println(ex)
     for i=1:length(p)-1
         ex = :($ex * $(x) + $(p[length(p)-i]))
-        println(ex)
     end
-    println(ex)
     return ex
 end
