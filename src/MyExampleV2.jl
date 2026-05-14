@@ -1,5 +1,6 @@
 module MyExampleV2
 using ForwardDiff
+using Unitful
 
 include("functions.jl")
 include("strangsmatrix.jl")
