@@ -21,7 +21,13 @@ function test_strangs_matrix(matrix)
 end
 
 
-@testset "MyExampleV2.jl" begin
+@testset "Test strangs structure" begin
     @test test_strangs_matrix(strangs_matrix(5)) == true
     @test test_strangs_matrix(strangs_matrix(10)) == true
+end
+
+@testset "Test strangs lazy multiply" begin
+    A = LazyStrangsMatrix(4)
+    b = [1., 2., 3., 4.]    
+    @test A*b == [0.0, 0.0, 0.0, -5.0]
 end
