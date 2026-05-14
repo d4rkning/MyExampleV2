@@ -1,5 +1,6 @@
 using MyExampleV2
 using Test
+using IterativeSolvers
 
 function test_strangs_matrix(matrix)
     N = size(matrix)
@@ -31,7 +32,7 @@ end
     b = [1., 2., 3., 4.]    
     @test A*b == [0.0, 0.0, 0.0, -5.0]
     c = [1., 2., 3.]
-    @test_throws BoundsError A*c
+    @test_throws DimensionMismatch A*c
 
     A = LazyStrangsMatrix(1)
     b = [1.]
@@ -86,5 +87,12 @@ end
         @test_throws BoundsError A[:, 6]
         @test_throws BoundsError A[0, :]
         @test_throws BoundsError A[6, :]
+    end
+
+    @testset "Iterative solvers test" begin
+        A_cg = LazyStrangsMatrix(100)
+        b_cg = rand(100)
+        x = IterativeSolvers.cg(A_cg, b_cg)
+        @test A_cg * x ≈ b_cg
     end
 end
