@@ -14,6 +14,4 @@ function _MyRange(a::MyRange, i::Int)
     return b
 end
 Base.getindex(a::MyRange, i::Int) = _MyRange(a, i)
-
-
-(c::MyRange)(b::Float64) = c.start + c.step * (b-1)
+Base.getindex(a::MyRange, b::Float64) = a.start + a.step * (b-1)
