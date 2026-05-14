@@ -31,6 +31,6 @@ using Test
 
     @testset "Linear interpolation test" begin
         r4 = MyRange(1, 2, 20)
-        r4[1.1] \approx 1.2
+        r4[1.1] ≈ 1.2
     end
 end
