@@ -1,5 +1,6 @@
 module MyExampleV2
 using ForwardDiff
+using LinearAlgebra
 
 include("functions.jl")
 include("strangsmatrix.jl")

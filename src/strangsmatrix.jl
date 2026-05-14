@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 struct StrangsMatrix
     mat::Matrix{Float64}
  end
