@@ -42,9 +42,49 @@ Base.exp(a::MultiVariateDual) = MultiVariateDual(exp(a.x), exp(a.x) .* a.dx)
 
 Base.log(a::MultiVariateDual) = MultiVariateDual(log(a.x), a.dx ./ a.x)
 
+Base.:<(a::MultiVariateDual, b::MultiVariateDual) = a.x < b.x
+Base.:<(a::Real, b::MultiVariateDual) = a < b.x
+Base.:<(a::MultiVariateDual, b::Real) = a.x < b
+
+Base.:<=(a::MultiVariateDual, b::MultiVariateDual) = a.x <= b.x
+
 h(x::MultiVariateDual, y::MultiVariateDual) = x+y
 
 h(MultiVariateDual(2.0, [1.0, 0.0]), MultiVariateDual(3.0, [0.0, 1.0]))
 
 i(x::MultiVariateDual, y::MultiVariateDual) = x*y
 i(MultiVariateDual(2.0, [1.0, 0.0]), MultiVariateDual(3.0, [0.0, 1.0]))
+
+function gradient(f, x::Vector{Float64})
+    n = length(x)
+    seeds = [MultiVariateDual(x[i], [Float64(i==j) for j in 1:n]) for i in 1:n]
+    result = f(seeds...)
+    return result.dx
+end
+
+
+function gradient_descent(f, x_init::Vector{Float64}; alpha=0.01, tol=1e-6, max_iters=1000)
+    # Copy the initial vector so we don't mutate the user's original array
+    x = copy(x_init)
+    n = length(x)
+    
+    for iter in 1:max_iters
+        # 1. Forward pass to evaluate value and gradient
+        seeds = [MultiVariateDual(x[i], [Float64(i==j) for j in 1:n]) for i in 1:n]
+        result = f(seeds...)
+        
+        # 2. Convergence check (Norm of the gradient)
+        if norm(result.dx) < tol
+            println("Converged in $iter iterations.")
+            return x, result.x 
+        end
+        
+        # 3. Take the step scaled by learning rate
+        x = x - alpha * result.dx
+    end
+    
+    println("Warning: Reached max_iters without fully converging.")
+    return x, f([MultiVariateDual(x[i], [Float64(i==j) for j in 1:n]) for i in 1:n]...).x
+end
+test_func(x, y) = (x^10) * exp(y)
+@time gradient_descent(test_func, [2.0, 1.0])
