@@ -15,3 +15,17 @@ f(x::Dual) = sin(x) + x*x
 f(Dual(2, 1))
 g(x::Dual, y::Dual) = x*y
 g(Dual(2, 1), Dual(3, 1))
+
+struct MultiVariateDual
+    x::Float64
+    dx::Vector{Float64}
+end
+
+Base.:+(a::MultiVariateDual, b::MultiVariateDual) = MultiVariateDual(a.x + b.x, a.dx + b.dx)
+Base.:*(a::MultiVariateDual, b::MultiVariateDual) = MultiVariateDual(a.x * b.x, b.dx * a.x + b.x * a.dx)
+
+h(x::MultiVariateDual, y::MultiVariateDual) = x+y
+h(MultiVariateDual(2.0, [1.0, 0.0]), MultiVariateDual(3.0, [0.0, 1.0]))
+
+i(x::MultiVariateDual, y::MultiVariateDual) = x*y
+i(MultiVariateDual(2.0, [1.0, 0.0]), MultiVariateDual(3.0, [0.0, 1.0]))
