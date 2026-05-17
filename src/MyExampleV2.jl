@@ -2,6 +2,8 @@ module MyExampleV2
 using ForwardDiff
 using LinearAlgebra
 using IterativeSolvers
+using RDatasets
+using Clustering
 
 include("functions.jl")
 include("strangsmatrix.jl")
