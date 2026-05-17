@@ -4,6 +4,7 @@ using LinearAlgebra
 using IterativeSolvers
 using RDatasets
 using Clustering
+using DifferentialEquations
 
 include("functions.jl")
 include("strangsmatrix.jl")
