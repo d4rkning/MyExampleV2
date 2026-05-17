@@ -4,6 +4,7 @@ version = "1.0.0-DEV"
 authors = ["Chris Schellekens"]
 
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -18,6 +19,7 @@ Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
+BenchmarkTools = "1.8.0"
 Clustering = "0.15.8"
 DifferentialEquations = "8.0.0"
 Distributions = "0.25.125"
