@@ -96,3 +96,59 @@ Base.:+(a::MyParameterizedComplex, b::MyParameterizedComplex) = MyParameterizedC
 Base.:+(a::MyParameterizedComplex, b::Int) = MyParameterizedComplex(a.real + b, a.image)
 Base.:+(a::Int, b::MyParameterizedComplex) = MyParameterizedComplex(a + b.real, b.image)
 g(MyParameterizedComplex(1.0, 1.0), MyParameterizedComplex(1.0, 1.0))
+
+x = [2.0, 4.]
+function r(x)
+     a= 4
+     b = 2 
+     for i in 1:100
+        c = f(x[1], a)
+        d = f(b, c)
+        a = f(d, x[2])
+     end
+end
+
+@btime r(x)
+
+s(x) = _s(x[1], x[2])
+function _s(x1, x2)
+    a = 4
+     b = 2 
+     for i in 1:100
+        c = f(x1, a)
+        d = f(b, c)
+        a = f(d, x2)
+     end
+end
+@btime s(x)
+
+function fff(x)
+    if x isa Int
+        y = 2
+    else
+        y = 4.0
+    end
+    x + y
+end
+
+@code_llvm fff(5)
+@code_llvm fff(2.0)
+x = 5
+@code_llvm fff(x)
+
+A = rand(100, 100)
+B = rand(100, 100)
+C = rand(100, 100)
+@btime for j in 1:100, i in 1:100
+    global A, B, C
+    C[i, j] = A[i,j] + B[i,j]
+end
+
+function f(A, B, C)
+    for j in 1:100, i in 1:100
+        C[i, j] = A[i,j] + B[i,j]
+    end
+end
+
+@btime f(A, B, C)
+@code_llvm f(A, B, C)
