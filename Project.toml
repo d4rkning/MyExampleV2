@@ -5,6 +5,7 @@ authors = ["Chris Schellekens"]
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -15,12 +16,15 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 RDatasets = "ce6b1742-4840-55fa-b093-852dadbb1d8b"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
 [compat]
 BenchmarkTools = "1.8.0"
+CUDA = "6.1.0"
 Clustering = "0.15.8"
 DifferentialEquations = "8.0.0"
 Distributions = "0.25.125"
@@ -31,9 +35,11 @@ LinearAlgebra = "1.10"
 NLsolve = "4.5.1"
 Optim = "1.13.3"
 Plots = "1.41.6"
+ProgressMeter = "1.11.0"
 RDatasets = "0.8.1"
 Roots = "3.0.0"
 Unitful = "1.28.0"
+cuDNN = "6.1.0"
 julia = "1.10.10"
 
 [extras]
