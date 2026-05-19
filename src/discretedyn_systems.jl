@@ -146,4 +146,5 @@ plot(x,y,z)
 @btime solve_system_mutate(lorenz!, [1.0, 0.0, 0.0], p, 1000);
 @btime solve_system_save_static(lorenz_static, @SVector[1.0, 0.0, 0.0], p, 1000);
 u = Vector{typeof(@SVector([1.0,0.0,0.0]))}(undef,1000);
+size(u)
 @btime solve_system_save!(u,lorenz_static,@SVector([1.0,0.0,0.0]),p,1000);
