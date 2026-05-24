@@ -96,15 +96,15 @@ end
 # Non-allocating, in-place ODE function
 function heat_equation!(du, u, p, t)
     F, params, Α_cache = p
-    Α = get_tmp(Α_cache, u)
 
+    Α = get_tmp(Α_cache, u)
     compute_local_alpha!(Α, params.α, params.γ, u)
     du .= F
 
     #NOTE(Chris): Should probably be allocated outside of heat_equation!
-    Ke =  ((1.0)/(2.0 * p.h)) * [1.0 -1.0; -1.0 1.0]
+    Ke =  ((1.0)/(2.0 * params.h)) * [1.0 -1.0; -1.0 1.0]
     for e in 1:(params.N - 1)
-        Ke .= (Α[e] + Α[e+1])
+        Ke .* (Α[e] + Α[e+1])
         flux = Ke * u[e]
         du[e] -= flux[1]
         du[e+1] += flux[2]
@@ -112,6 +112,7 @@ function heat_equation!(du, u, p, t)
     penalty = 1e10
     du[1] = -penalty * u[1]
     du[end] = -penalty * u[end]
+end
 
 
 function main()
@@ -138,7 +139,6 @@ function main()
     u0[end] = 0.0      
 
     Α_cache = dualcache(zeros(typeof(α_val), n))
-    K_nzval_cache = dualcache(GlbK.nzval)
 
     # Parameter tuple
     p = (F, params, Α_cache)
@@ -147,7 +147,7 @@ function main()
         heat_equation!, 
     )
 
-    tspan = (0.0, 0.5)
+    tspan = (0.0, 1.0)
     prob = ODEProblem(func, u0, tspan, p)
     
     # Solve
@@ -167,13 +167,13 @@ function main()
         plot(x, sol.u[i], ylim=(0, 1.1), 
              ylabel="Temperature", xlabel="x (Position)", 
              title="Time: $(round(t_current, digits=2))s",
-             label="FEM Numerical", color=:red, linewidth=4, alpha=0.5)
+             label="Non-Linear FEM", color=:red, linewidth=4, alpha=0.5)
              
         plot!(x, analytical(x, t_current, α_val, L), 
-              label="Exact Analytical", color=:black, linestyle=:dash, linewidth=2)
+              label="Linear Analytical", color=:black, linestyle=:dash, linewidth=2)
     end
 
-    gif(anim, "classical_heat_equation.gif", fps=15)
+    gif(anim, "nonlienar_heat_equation.gif", fps=15)
 end
 
 main()
