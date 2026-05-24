@@ -1,13 +1,24 @@
-using LinearAlgebra, DifferentialEquations, Plots, SparseArrays
+using LinearAlgebra, DifferentialEquations, Plots, SparseArrays, PreallocationTools
 
 Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer}
     α::T = 1.0        # Default value provided
     h::T              # No default, must be specified
     N::I = 100        # Default integer value
+    γ::T = 1.0
 end
 
-function assemble_sparse_matrices(p::HeatEquationParameters)
-    Me = (p.h / 6.0) * [2.0 1.0; 1.0 2.0]
+function assemble_K!(K::SparseMatrixCSC, p::HeatEquationParameters, Α::AbstractVector)
+    Ke =  (1.0/(2.0 * p.h)) * [1.0 -1.0; -1.0 1.0]
+    idx = 1
+    @inbounds for e in 1:(p.N - 1)
+        for local_i in 1:2, local_j in 1:2
+            K[idx] = (Α[e] + Α[e+1]) * Ke[local_i, local_j]
+            idx += 1
+        end
+    end
+end
+
+function assemble_K(p::HeatEquationParameters)
     Ke = (p.α / p.h) * [1.0 -1.0; -1.0 1.0]
     
     num_entries = 4 * (p.N - 1)
@@ -16,7 +27,6 @@ function assemble_sparse_matrices(p::HeatEquationParameters)
     
     # FIX: Use the exact type (T) from the parameter struct for type stability
     T_val = typeof(p.α) 
-    V_M = zeros(T_val, num_entries)
     V_K = zeros(T_val, num_entries)
     
     idx = 1
@@ -26,13 +36,42 @@ function assemble_sparse_matrices(p::HeatEquationParameters)
         for local_i in 1:2, local_j in 1:2
             I[idx] = nodes[local_i]
             J[idx] = nodes[local_j]
-            V_M[idx] = Me[local_i, local_j]
             V_K[idx] = Ke[local_i, local_j]
             idx += 1
         end
     end
     
-    return sparse(I, J, V_M, p.N, p.N), sparse(I, J, V_K, p.N, p.N)
+    return sparse(I, J, V_K, p.N, p.N)
+end
+
+function assemble_M(p::HeatEquationParameters)
+    Me = (p.h / 6.0) * [2.0 1.0; 1.0 2.0]
+    
+    num_entries = 4 * (p.N - 1)
+    I = zeros(Int, num_entries)
+    J = zeros(Int, num_entries)
+    
+    # FIX: Use the exact type (T) from the parameter struct for type stability
+    T_val = typeof(p.α) 
+    V_M = zeros(T_val, num_entries)
+    
+    idx = 1
+    @inbounds for e in 1:(p.N - 1)
+        nodes = (e, e+1)
+        
+        for local_i in 1:2, local_j in 1:2
+            I[idx] = nodes[local_i]
+            J[idx] = nodes[local_j]
+            V_M[idx] = Me[local_i, local_j]
+            idx += 1
+        end
+    end
+    
+    return sparse(I, J, V_M, p.N, p.N)
+end
+
+function assemble_sparse_matrices(p::HeatEquationParameters)
+    return assemble_M(p), assemble_K(p)
 end
 
 function apply_boundary_conditions_penalty!(M::SparseMatrixCSC, K::SparseMatrixCSC, F::Vector)
@@ -50,12 +89,31 @@ function apply_boundary_conditions_penalty!(M::SparseMatrixCSC, K::SparseMatrixC
     M[end, end] = 1.0
 end
 
+function compute_local_alpha!(Α::AbstractVector, Α_0::Real, γ::Real, u::AbstractVector)
+    Α .= Α_0 * (1.0 .+ γ*u)
+end
+
 # Non-allocating, in-place ODE function
 function heat_equation!(du, u, p, t)
-    K, F = p
-    mul!(du, K, u)
-    du .= F .- du 
+    F, params, Α_cache = p
+
+    Α = get_tmp(Α_cache, u)
+    compute_local_alpha!(Α, params.α, params.γ, u)
+    du .= F
+
+    #NOTE(Chris): Should probably be allocated outside of heat_equation!
+    Ke =  ((1.0)/(2.0 * params.h)) * [1.0 -1.0; -1.0 1.0]
+    for e in 1:(params.N - 1)
+        Ke .* (Α[e] + Α[e+1])
+        flux = Ke * u[e]
+        du[e] -= flux[1]
+        du[e+1] += flux[2]
+    end
+    penalty = 1e10
+    du[1] = -penalty * u[1]
+    du[end] = -penalty * u[end]
 end
+
 
 function main()
     L = 1.0
@@ -80,17 +138,16 @@ function main()
     u0[1] = 0.0         
     u0[end] = 0.0      
 
-    # Parameter tuple
-    p = (GlbK, F)
+    Α_cache = dualcache(zeros(typeof(α_val), n))
 
-    # Define the ODE function with the Mass Matrix AND Analytic Jacobian
+    # Parameter tuple
+    p = (F, params, Α_cache)
+
     func = ODEFunction(
         heat_equation!, 
-        mass_matrix=GlbM,
-        jac_prototype=-GlbK # FIX: Speeds up the implicit solver significantly
     )
 
-    tspan = (0.0, 0.5)
+    tspan = (0.0, 1.0)
     prob = ODEProblem(func, u0, tspan, p)
     
     # Solve
@@ -110,13 +167,13 @@ function main()
         plot(x, sol.u[i], ylim=(0, 1.1), 
              ylabel="Temperature", xlabel="x (Position)", 
              title="Time: $(round(t_current, digits=2))s",
-             label="FEM Numerical", color=:red, linewidth=4, alpha=0.5)
+             label="Non-Linear FEM", color=:red, linewidth=4, alpha=0.5)
              
         plot!(x, analytical(x, t_current, α_val, L), 
-              label="Exact Analytical", color=:black, linestyle=:dash, linewidth=2)
+              label="Linear Analytical", color=:black, linestyle=:dash, linewidth=2)
     end
 
-    gif(anim, "classical_heat_equation.gif", fps=15)
+    gif(anim, "nonlienar_heat_equation.gif", fps=15)
 end
 
 main()
