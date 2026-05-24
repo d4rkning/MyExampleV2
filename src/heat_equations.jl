@@ -95,17 +95,24 @@ end
 
 # Non-allocating, in-place ODE function
 function heat_equation!(du, u, p, t)
-    m, n, colptr, rowval, K_nzval_cache, F, params, Α_cache = p
+    F, params, Α_cache = p
     Α = get_tmp(Α_cache, u)
-    K_nzval = get_tmp(K_nzval_cache, u)
-    K = SparseMatrixCSC(m, n, colptr, rowval, K_nzval)
 
-    K .= 0.0
     compute_local_alpha!(Α, params.α, params.γ, u)
-    assemble_K!(K, params, Α)
-    mul!(du, K, u)
-    du .= F .- du 
-end
+    du .= F
+
+    #NOTE(Chris): Should probably be allocated outside of heat_equation!
+    Ke =  ((1.0)/(2.0 * p.h)) * [1.0 -1.0; -1.0 1.0]
+    for e in 1:(params.N - 1)
+        Ke .= (Α[e] + Α[e+1])
+        flux = Ke * u[e]
+        du[e] -= flux[1]
+        du[e+1] += flux[2]
+    end
+    penalty = 1e10
+    du[1] = -penalty * u[1]
+    du[end] = -penalty * u[end]
+
 
 function main()
     L = 1.0
@@ -119,9 +126,6 @@ function main()
 
     # FIX: Assemble directly into sparse matrices. No zeros(n, n) dense matrices used!
     GlbM, GlbK = assemble_sparse_matrices(params)
-    m, n = size(GlbK)
-    colptr = GlbK.colptr
-    rowval = GlbK.rowval
     
     F = zeros(typeof(α_val), n)
 
@@ -137,7 +141,7 @@ function main()
     K_nzval_cache = dualcache(GlbK.nzval)
 
     # Parameter tuple
-    p = (m, n, colptr, rowval, K_nzval_cache, F, params, Α_cache)
+    p = (F, params, Α_cache)
 
     func = ODEFunction(
         heat_equation!, 
