@@ -1,13 +1,24 @@
-using LinearAlgebra, DifferentialEquations, Plots, SparseArrays
+using LinearAlgebra, DifferentialEquations, Plots, SparseArrays, PreallocationTools
 
 Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer}
     α::T = 1.0        # Default value provided
     h::T              # No default, must be specified
     N::I = 100        # Default integer value
+    γ::T = 1.0
 end
 
-function assemble_sparse_matrices(p::HeatEquationParameters)
-    Me = (p.h / 6.0) * [2.0 1.0; 1.0 2.0]
+function assemble_K!(K::SparseMatrixCSC, p::HeatEquationParameters, Α::AbstractVector)
+    Ke =  (1.0/(2.0 * p.h)) * [1.0 -1.0; -1.0 1.0]
+    idx = 1
+    @inbounds for e in 1:(p.N - 1)
+        for local_i in 1:2, local_j in 1:2
+            K[idx] = (Α[e] + Α[e+1]) * Ke[local_i, local_j]
+            idx += 1
+        end
+    end
+end
+
+function assemble_K(p::HeatEquationParameters)
     Ke = (p.α / p.h) * [1.0 -1.0; -1.0 1.0]
     
     num_entries = 4 * (p.N - 1)
@@ -16,7 +27,6 @@ function assemble_sparse_matrices(p::HeatEquationParameters)
     
     # FIX: Use the exact type (T) from the parameter struct for type stability
     T_val = typeof(p.α) 
-    V_M = zeros(T_val, num_entries)
     V_K = zeros(T_val, num_entries)
     
     idx = 1
@@ -26,13 +36,42 @@ function assemble_sparse_matrices(p::HeatEquationParameters)
         for local_i in 1:2, local_j in 1:2
             I[idx] = nodes[local_i]
             J[idx] = nodes[local_j]
-            V_M[idx] = Me[local_i, local_j]
             V_K[idx] = Ke[local_i, local_j]
             idx += 1
         end
     end
     
-    return sparse(I, J, V_M, p.N, p.N), sparse(I, J, V_K, p.N, p.N)
+    return sparse(I, J, V_K, p.N, p.N)
+end
+
+function assemble_M(p::HeatEquationParameters)
+    Me = (p.h / 6.0) * [2.0 1.0; 1.0 2.0]
+    
+    num_entries = 4 * (p.N - 1)
+    I = zeros(Int, num_entries)
+    J = zeros(Int, num_entries)
+    
+    # FIX: Use the exact type (T) from the parameter struct for type stability
+    T_val = typeof(p.α) 
+    V_M = zeros(T_val, num_entries)
+    
+    idx = 1
+    @inbounds for e in 1:(p.N - 1)
+        nodes = (e, e+1)
+        
+        for local_i in 1:2, local_j in 1:2
+            I[idx] = nodes[local_i]
+            J[idx] = nodes[local_j]
+            V_M[idx] = Me[local_i, local_j]
+            idx += 1
+        end
+    end
+    
+    return sparse(I, J, V_M, p.N, p.N)
+end
+
+function assemble_sparse_matrices(p::HeatEquationParameters)
+    return assemble_M(p), assemble_K(p)
 end
 
 function apply_boundary_conditions_penalty!(M::SparseMatrixCSC, K::SparseMatrixCSC, F::Vector)
@@ -50,9 +89,20 @@ function apply_boundary_conditions_penalty!(M::SparseMatrixCSC, K::SparseMatrixC
     M[end, end] = 1.0
 end
 
+function compute_local_alpha!(Α::AbstractVector, Α_0::Real, γ::Real, u::AbstractVector)
+    Α .= Α_0 * (1.0 .+ γ*u)
+end
+
 # Non-allocating, in-place ODE function
 function heat_equation!(du, u, p, t)
-    K, F = p
+    m, n, colptr, rowval, K_nzval_cache, F, params, Α_cache = p
+    Α = get_tmp(Α_cache, u)
+    K_nzval = get_tmp(K_nzval_cache, u)
+    K = SparseMatrixCSC(m, n, colptr, rowval, K_nzval)
+
+    K .= 0.0
+    compute_local_alpha!(Α, params.α, params.γ, u)
+    assemble_K!(K, params, Α)
     mul!(du, K, u)
     du .= F .- du 
 end
@@ -69,6 +119,9 @@ function main()
 
     # FIX: Assemble directly into sparse matrices. No zeros(n, n) dense matrices used!
     GlbM, GlbK = assemble_sparse_matrices(params)
+    m, n = size(GlbK)
+    colptr = GlbK.colptr
+    rowval = GlbK.rowval
     
     F = zeros(typeof(α_val), n)
 
@@ -80,14 +133,14 @@ function main()
     u0[1] = 0.0         
     u0[end] = 0.0      
 
-    # Parameter tuple
-    p = (GlbK, F)
+    Α_cache = dualcache(zeros(typeof(α_val), n))
+    K_nzval_cache = dualcache(GlbK.nzval)
 
-    # Define the ODE function with the Mass Matrix AND Analytic Jacobian
+    # Parameter tuple
+    p = (m, n, colptr, rowval, K_nzval_cache, F, params, Α_cache)
+
     func = ODEFunction(
         heat_equation!, 
-        mass_matrix=GlbM,
-        jac_prototype=-GlbK # FIX: Speeds up the implicit solver significantly
     )
 
     tspan = (0.0, 0.5)
