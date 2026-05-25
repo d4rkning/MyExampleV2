@@ -1,4 +1,4 @@
-using LinearAlgebra, DifferentialEquations, Plots, SparseArrays, PreallocationTools
+using LinearAlgebra, DifferentialEquations, Plots, SparseArrays, PreallocationTools, BenchmarkTools
 abstract type AbstractBoundaryCondition end
 
 Base.@kwdef struct DirichletBC{T<:Real} <: AbstractBoundaryCondition
@@ -28,13 +28,13 @@ function apply_boundary!(du, u, node_idx, bc::RobinBC)
 end
 
 
-Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer, BC_Left<:AbstractBoundaryCondition, BC_RRight<:AbstractBoundaryCondition}
+Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer, BCLeft<:AbstractBoundaryCondition, BCRight<:AbstractBoundaryCondition}
     α::T = 1.0        # Default value provided
     h::T              # No default, must be specified
     N::I = 100        # Default integer value
     γ::T = 2.0
-    BC_Left::BC_Left
-    BC_RRight::BC_RRight
+    BC_Left::BCLeft
+    BC_Right::BCRight
 end
 
 function assemble_K!(K::SparseMatrixCSC, p::HeatEquationParameters, Α::AbstractVector)
@@ -141,7 +141,7 @@ function heat_equation!(du, u, p, t)
         du[e+1] += scalar_flux
     end
     apply_boundary!(du, u, 1, params.BC_Left)
-    apply_boundary!(du, u, params.N, params.BC_RRight)
+    apply_boundary!(du, u, params.N, params.BC_Right)
 end
 
 function main()
@@ -152,7 +152,13 @@ function main()
     # Keeping everything Float64 to match the initial conditions and SciML tolerances
     h_val = L / (n - 1)
     α_val = 1.0
-    params = HeatEquationParameters(N=n, h=h_val, α=α_val)
+    params = HeatEquationParameters(
+        N=n, 
+        h=h_val, 
+        α=α_val,
+        BC_Left=DirichletBC(0.0, 1e10),
+        BC_Right=DirichletBC(0.0, 1e10)    
+        )
 
     # FIX: Assemble directly into sparse matrices. No zeros(n, n) dense matrices used!
     GlbM, GlbK = assemble_sparse_matrices(params)
@@ -180,7 +186,7 @@ function main()
     prob = ODEProblem(func, u0, tspan, p)
     
     # Solve
-    sol = solve(prob, Rodas5P(), saveat=0.01)
+    sol = @btime solve($prob, Rodas5P(), saveat=0.01)
 
     # ==========================================
     # ANALYTICAL SOLUTION & PLOTTING
