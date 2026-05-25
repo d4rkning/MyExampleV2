@@ -28,11 +28,13 @@ function apply_boundary!(du, u, node_idx, bc::RobinBC)
 end
 
 
-Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer}
+Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer, BC_Left<:AbstractBoundaryCondition, BC_RRight<:AbstractBoundaryCondition}
     α::T = 1.0        # Default value provided
     h::T              # No default, must be specified
     N::I = 100        # Default integer value
     γ::T = 2.0
+    BC_Left::BC_Left
+    BC_RRight::BC_RRight
 end
 
 function assemble_K!(K::SparseMatrixCSC, p::HeatEquationParameters, Α::AbstractVector)
@@ -138,9 +140,8 @@ function heat_equation!(du, u, p, t)
         du[e] -= scalar_flux
         du[e+1] += scalar_flux
     end
-    penalty = 1e10
-    du[1] = -penalty * u[1]
-    du[end] = -penalty * u[end]
+    apply_boundary!(du, u, 1, params.BC_Left)
+    apply_boundary!(du, u, params.N, params.BC_RRight)
 end
 
 function main()
