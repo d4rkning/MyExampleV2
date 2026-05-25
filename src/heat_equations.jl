@@ -1,4 +1,32 @@
 using LinearAlgebra, DifferentialEquations, Plots, SparseArrays, PreallocationTools
+abstract type AbstractBoundaryCondition end
+
+Base.@kwdef struct DirichletBC{T<:Real} <: AbstractBoundaryCondition
+    temperature::T
+    penalty::T = 1e10
+end
+
+Base.@kwdef struct NeumannBC{T<:Real} <: AbstractBoundaryCondition
+    flux::T
+end
+
+Base.@kwdef struct RobinBC{T<:Real} <: AbstractBoundaryCondition
+    h_conv::T
+    u_ambient::T
+end
+
+function apply_boundary!(du, u, node_idx, bc::DirichletBC)
+    du[node_idx] = -bc.penalty * (u[node_idx] - bc.temperature)
+end
+
+function apply_boundary!(du, u, node_idx, bc::NeumannBC)
+    du[node_idx] += bc.flux
+end
+
+function apply_boundary!(du, u, node_idx, bc::RobinBC)
+    du[node_idx] -= bc.h_conv * (u[node_idx] - bc.u_ambient)
+end
+
 
 Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer}
     α::T = 1.0        # Default value provided
@@ -103,14 +131,10 @@ function heat_equation!(du, u, p, t)
 
     factor = 1.0 / params.h
     @inbounds for e in 1:(params.N - 1)
-        # 1. Average the alpha for this specific element
         alpha_e = (Α[e] + Α[e+1]) / 2.0
         
-        # 2. Calculate the exact flux using SCALARS! (Zero allocations)
-        # This single line replaces Ke, the matrix multiplication, and flux[1]/flux[2]
         scalar_flux = factor * alpha_e * (u[e] - u[e+1])
         
-        # 3. Accumulate into the global derivative vector
         du[e] -= scalar_flux
         du[e+1] += scalar_flux
     end
@@ -118,7 +142,6 @@ function heat_equation!(du, u, p, t)
     du[1] = -penalty * u[1]
     du[end] = -penalty * u[end]
 end
-
 
 function main()
     L = 1.0
@@ -152,7 +175,7 @@ function main()
         heat_equation!, 
     )
 
-    tspan = (0.0, 10.0)
+    tspan = (0.0, 1.0)
     prob = ODEProblem(func, u0, tspan, p)
     
     # Solve
