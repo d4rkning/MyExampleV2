@@ -120,7 +120,7 @@ function apply_boundary_conditions_penalty!(M::SparseMatrixCSC, K::SparseMatrixC
 end
 
 function compute_local_alpha!(Α::AbstractVector, Α_0::Real, γ::Real, u::AbstractVector)
-    Α .= Α_0 * (1.0 .+ γ*u)
+    @. Α = Α_0 * (1.0 + γ*u)
 end
 
 # Non-allocating, in-place ODE function
