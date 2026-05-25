@@ -4,7 +4,7 @@ Base.@kwdef struct HeatEquationParameters{T<:Real, I<:Integer}
     α::T = 1.0        # Default value provided
     h::T              # No default, must be specified
     N::I = 100        # Default integer value
-    γ::T = 1.0
+    γ::T = 2.0
 end
 
 function assemble_K!(K::SparseMatrixCSC, p::HeatEquationParameters, Α::AbstractVector)
@@ -101,13 +101,18 @@ function heat_equation!(du, u, p, t)
     compute_local_alpha!(Α, params.α, params.γ, u)
     du .= F
 
-    #NOTE(Chris): Should probably be allocated outside of heat_equation!
-    Ke =  ((1.0)/(2.0 * params.h)) * [1.0 -1.0; -1.0 1.0]
-    for e in 1:(params.N - 1)
-        Ke .* (Α[e] + Α[e+1])
-        flux = Ke * u[e]
-        du[e] -= flux[1]
-        du[e+1] += flux[2]
+    factor = 1.0 / params.h
+    @inbounds for e in 1:(params.N - 1)
+        # 1. Average the alpha for this specific element
+        alpha_e = (Α[e] + Α[e+1]) / 2.0
+        
+        # 2. Calculate the exact flux using SCALARS! (Zero allocations)
+        # This single line replaces Ke, the matrix multiplication, and flux[1]/flux[2]
+        scalar_flux = factor * alpha_e * (u[e] - u[e+1])
+        
+        # 3. Accumulate into the global derivative vector
+        du[e] -= scalar_flux
+        du[e+1] += scalar_flux
     end
     penalty = 1e10
     du[1] = -penalty * u[1]
@@ -147,7 +152,7 @@ function main()
         heat_equation!, 
     )
 
-    tspan = (0.0, 1.0)
+    tspan = (0.0, 10.0)
     prob = ODEProblem(func, u0, tspan, p)
     
     # Solve
