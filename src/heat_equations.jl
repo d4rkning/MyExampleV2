@@ -177,9 +177,14 @@ function main()
 
     # Parameter tuple
     p = (F, params, Α_cache)
+    dummy_diag = ones(typeof(α_val), n)
+    dummy_off = ones(typeof(α_val), n-1)
+    J_pattern = sparse(Tridiagonal(dummy_off, dummy_diag, dummy_off))
 
     func = ODEFunction(
         heat_equation!, 
+        mass_matrix=GlbM,
+        jac_prototype=J_pattern # The solver will now use sparse memory allocation!
     )
 
     tspan = (0.0, 1.0)
